@@ -23,10 +23,7 @@ Tamano={
     "Grande":{"plantas": (5,7), "tanques": (20,50), "nodosTrans": (25,50), "nodosFinal": (50,100)} }
 
 #Restricciones
-
 #Declaracion tipo de variable
-
-
 #achivoInstancias
 def archivoInstancias(instancia):
     match instancia:
@@ -36,15 +33,12 @@ def archivoInstancias(instancia):
             pass #placeholder. eliminar dps de poner codigo.
         case 3:
             pass #placeholder. eliminar dps de poner codigo.
-    
 def generadordemanda():
     demanda = random.randint(40,100)
     return demanda
 def generadorcostos():
     costo = random.randint(2,8)
     return costo
-
-
 #generador de instancias
 def generadorInstancias(instancia, cantidad):
     match instancia:
@@ -96,46 +90,148 @@ def generadorInstancias(instancia, cantidad):
     for n in NodosTrans.keys():
         for i in NodosFinal.keys():
             Arcos.append({"origen": n, "destino": i, "costo": generadorcostos()})
-
-
-    print(Nodos)
-    print(Arcos)
+    return Nodos, Arcos
     #archivoInstancias(instancia)
     
-
-def generadorarchivoa(instancia,Nodos):
+def generadorarchivoa(instancia, Nodos, Arcos):
     archivo = f"instancia_aleatoria_a.lp"
-    file = open(archivo, 'w')
-    file.write("/* archivo generado automáticamente*/") 
-    Funcion_obj=""
-    #for i in 
-    archivo.write("min: ;")#funcion objetivo
-    file.close()
+    with open(archivo, 'w') as file:
+        file.write("/* Archivo generado automáticamente */\n")
 
-    
-def generadorArchivoC(instancia, Nodos):
-    FO = "min: pija * xija + cija * fija ;"
-    restricciones = """ 
-    """
-    rds = """
-    xija es binaria
-    bin xij
-    fija es >= 0
-    int fij 
-    """ 
+        file.write("min: ")# 1. Función objetivo
+        for arco in Arcos:
+            for d in ["D1", "D3", "D5"]:
+                costo = Diametros[d]["costos"]["a"] + arco["costo"]
+                var = f"x_{arco['origen']}_{arco['destino']}_{d}"
+                file.write(f"{costo}*{var} + ")
+        file.write("0;\n\n") 
 
-    archivo = f"instancia_aleatoria_C.lp"
+        for arco in Arcos:# 2. Restricciones de capacidad de flujo
+            fvar = f"f_{arco['origen']}_{arco['destino']}"
+            expresion = f"{fvar}"
+            for d in ["D1", "D3", "D5"]:
+                capacidad = Diametros[d]["flujoMax"]
+                var_bin = f"x_{arco['origen']}_{arco['destino']}_{d}"
+                expresion += f" - {capacidad}*{var_bin}"
+            file.write(expresion + " <= 0;\n")
 
-   #with  openarchivoo, 'w' as file:)    #    fileo.write("/* archivogeneradoo automáticamente */"
-   #     file.write(f"{FO}\n{restricciones}\n{rds}"))
+        for nodo_tipo, grupo in Nodos.items():# 3. Conservación de flujo
+            for nodo, data in grupo.items():
+                if nodo_tipo == "plantas":
+                    for arco in Arcos:
+                        if arco['origen'] == nodo:
+                            file.write(f"f_{nodo}_{arco['destino']} + ")
+                    file.write("0 >= 0;\n")
+                elif nodo_tipo == "tanques" or nodo_tipo == "nodosTrans":
+                    for arco in Arcos:
+                        if arco['destino'] == nodo:
+                            file.write(f"f_{arco['origen']}_{nodo} + ")
+                    for arco in Arcos:
+                        if arco['origen'] == nodo:
+                            file.write(f"- f_{nodo}_{arco['destino']} ")
+                    file.write("= 0;\n")
+                elif nodo_tipo == "nodosFinal":
+                    demanda = data["demanda"]
+                    for arco in Arcos:
+                        if arco['destino'] == nodo:
+                            file.write(f"f_{arco['origen']}_{nodo} + ")
+                    file.write(f"0 = {demanda};\n")
 
+        file.write("\nbin ")# 4. Declaración de variables binarias
+        i = 0
+        for arco in Arcos:
+            for d in ["D1", "D3", "D5"]:
+                var = f"x_{arco['origen']}_{arco['destino']}_{d}"
+                if i == 0:
+                    file.write(f"{var}")
+                else:
+                    file.write(f",{var}")
+                i+=1
+        file.write(";\n")
 
+        i=0
+        file.write("int ")# 5. Declaración de variables de flujo
+        for arco in Arcos:
+            fvar = f"f_{arco['origen']}_{arco['destino']}"
+            if i == 0:
+                    file.write(f"{fvar}")
+            else:
+                    file.write(f",{fvar}")
+            i+=1
+        file.write(";\n")
 
+def generadorarchivoc(instancia, Nodos, Arcos):
+    archivo = f"instancia_aleatoria_c.lp"
+    with open(archivo, 'w') as file:
+        file.write("/* Archivo generado automáticamente */\n")
+
+        file.write("min: ")# 1. Función objetivo
+        for arco in Arcos:
+            for d in ["D1", "D3", "D5"]:
+                costo = Diametros[d]["costos"]["c"] + arco["costo"]
+                var = f"x_{arco['origen']}_{arco['destino']}_{d}"
+                file.write(f"{costo}*{var} + ")
+        file.write("0;\n\n") 
+
+        for arco in Arcos:# 2. Restricciones de capacidad de flujo
+            fvar = f"f_{arco['origen']}_{arco['destino']}"
+            expresion = f"{fvar}"
+            for d in ["D1", "D3", "D5"]:
+                capacidad = Diametros[d]["flujoMax"]
+                var_bin = f"x_{arco['origen']}_{arco['destino']}_{d}"
+                expresion += f" - {capacidad}*{var_bin}"
+            file.write(expresion + " <= 0;\n")
+
+        for nodo_tipo, grupo in Nodos.items():# 3. Conservación de flujo
+            for nodo, data in grupo.items():
+                if nodo_tipo == "plantas":
+                    for arco in Arcos:
+                        if arco['origen'] == nodo:
+                            file.write(f"f_{nodo}_{arco['destino']} + ")
+                    file.write("0 >= 0;\n")
+                elif nodo_tipo == "tanques" or nodo_tipo == "nodosTrans":
+                    for arco in Arcos:
+                        if arco['destino'] == nodo:
+                            file.write(f"f_{arco['origen']}_{nodo} + ")
+                    for arco in Arcos:
+                        if arco['origen'] == nodo:
+                            file.write(f"- f_{nodo}_{arco['destino']} ")
+                    file.write("= 0;\n")
+                elif nodo_tipo == "nodosFinal":
+                    demanda = data["demanda"]
+                    for arco in Arcos:
+                        if arco['destino'] == nodo:
+                            file.write(f"f_{arco['origen']}_{nodo} + ")
+                    file.write(f"0 = {demanda};\n")
+
+        file.write("\nbin ")# 4. Declaración de variables binarias
+        i = 0
+        for arco in Arcos:
+            for d in ["D1", "D3", "D5"]:
+                var = f"x_{arco['origen']}_{arco['destino']}_{d}"
+                if i == 0:
+                    file.write(f"{var}")
+                else:
+                    file.write(f",{var}")
+                i+=1
+        file.write(";\n")
+
+        i=0#esto es pa que se escriba bn en el archivo noma XD
+        file.write("int ")# 5. Declaración de variables de flujo
+        for arco in Arcos:
+            fvar = f"f_{arco['origen']}_{arco['destino']}"
+            if i == 0:
+                    file.write(f"{fvar}")
+            else:
+                    file.write(f",{fvar}")
+            i+=1
+        file.write(";\n")
 #Pedirle informacion al usuario
 #llamar a la funcion generadorInstancias -> archivoInstancias
 
 print("Ingrese el numero para seleccionar el tamaño del mapa que quiera crear")
 instancia=int(input("1. Pequeño \n2. Mediano\n3. Grande\n"))
 cantidadM=int(input("¿Cuantos mapas quiere generar?\n"))
-generadorInstancias(instancia, cantidadM)
-
+a =(generadorInstancias(instancia, cantidadM))
+generadorarchivoa(instancia,a[0],a[1])
+generadorarchivoc(instancia,a[0],a[1])
